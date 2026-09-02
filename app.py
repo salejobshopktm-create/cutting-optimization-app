@@ -111,16 +111,13 @@ def generate_pdf(grouped_patterns, stock_summary, demand_summary, kerf_width, co
     pdf.cell(0, 7, "2. Cut Length Color Legend", ln=1)
     pdf.set_font("Helvetica", "", 9)
     
-    # แก้ไขจุดนี้: ใช้ cell เสมือนช่องสี แทน rect เพื่อป้องกันการขาดออกจากกันระหว่างหน้า
     for cut in sorted(color_map.keys()):
         r, g, b = color_map[cut]["rgb"]
         pdf.set_fill_color(r, g, b)
         
-        # เช็คเผื่อพื้นที่หน้ากระดาษใกล้หมด
         if pdf.get_y() > 275:
             pdf.add_page()
             
-        # วาดกล่องสีผ่าน cell ขนาดเล็ก (กว้าง 8 มม., สูง 5 มม.)
         pdf.cell(8, 5, "", border=1, fill=True)
         pdf.set_x(25)
         qty = demand_summary.get(cut, 0)
@@ -139,14 +136,19 @@ def generate_pdf(grouped_patterns, stock_summary, demand_summary, kerf_width, co
         waste = p['waste']
         used = p['used']
         
-        # ป้องกัน Pattern โดนตัดขาดกลางคันระหว่างหน้ากระดาษ
         if pdf.get_y() > 250:
             pdf.add_page()
 
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(0, 6, f"Pattern #{idx}  |  Stock: {s_len:,} mm  ==>  Repeat Cut: x {count} bars", ln=1)
+        
+        # --- อัปเดตใหม่: จัดกลุ่มตัวเลขที่ซ้ำกันเป็น "ความยาว x จำนวน" ---
+        cut_counts = Counter(cuts)
+        cut_text = ", ".join([f"{k} x {v}" for k, v in cut_counts.items()])
+        
         pdf.set_font("Helvetica", "", 8)
-        pdf.cell(0, 4, f"Used: {used:,} mm | Waste: {waste:,} mm | Cut Pieces: {', '.join(map(str, cuts))}", ln=1)
+        # ใช้ multi_cell เพื่อให้ตัวหนังสือปัดบรรทัดให้อัตโนมัติหากยาวเกินหน้ากระดาษ
+        pdf.multi_cell(0, 4, f"Used: {used:,} mm | Waste: {waste:,} mm | Cut Pieces: {cut_text}")
         
         start_x = 15.0
         start_y = pdf.get_y() + 2
@@ -205,7 +207,6 @@ with col_right:
     )
 
 if st.button("🚀 คำนวณแผนการตัดเหล็ก", type="primary", use_container_width=True):
-    # กรองค่าว่าง (pd.notna) ป้องกันแอปล่มเมื่อเพิ่มแถวใหม่แต่ยังไม่พิมพ์ตัวเลข
     stocks = []
     for _, r in stock_df.iterrows():
         length = r.get("ความยาว (มม.)")
